@@ -101,9 +101,7 @@ while True:
     time.sleep(args.interval) # Wait for 10 seconds
 
     print("== Taking an image ==")
-    ret, raw_frame = cap.read()
-
-    frame = copy.deepcopy(raw_frame)
+    ret, frame = cap.read()
 
     if (np.shape(frame) == ()):
         print("Failed to receive an image from camera")
@@ -124,9 +122,8 @@ while True:
     os.makedirs(image_root, exist_ok=True)
 
 
-    crop_frame = copy.deepcopy(fitImagingArea(frame))
+    crop_frame = fitImagingArea(frame)
     cv2.imwrite(path_crop, crop_frame)
-
     cv2.imwrite(path_origin, frame)
 
     print(f"Image saved to {path_origin}")
