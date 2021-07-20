@@ -6,13 +6,27 @@ import serial
 import time
 import argparse
 import sys
+import subprocess
+import atexit
+
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--interval', '-i', type=int, default=60)
 parser.add_argument('--location', '-l', type=str, default="test")
 args = parser.parse_args()
 
+date = time.strftime("%Y%m%d",time.localtime(time.time()))
+time_stamp = time.strftime("%Y%m%d_%H%M%S",time.localtime(time.time()))
+image_root = f"images/{date}_{args.location}"
+os.makedirs(image_root, exist_ok=True)
+sys.stdout = open(f"{image_root}/log_{date}.txt", "a")
 
+@atexit.register
+def goodbye():
+    print(f"\n\n========== Finished working at {time_stamp} ==========\n\n")
+
+print(f"\n\n========== Start logging at {time_stamp} ==========\n\n")
 
 def fitImagingArea(img, thr=240, target_size=2000):
 
@@ -39,26 +53,30 @@ def fitImagingArea(img, thr=240, target_size=2000):
     target_transform = np.float32([[0,0],[0,target_size],[target_size,target_size],[target_size,0]])
     try:
         tf_matrix = cv2.getPerspectiveTransform(original_transform, target_transform)
+        img_transformed = cv2.warpPerspective(img, tf_matrix, (target_size,target_size))
+        return img_transformed
     except:
         print("Error occured in cv2.getPerspectiveTransform")
         print("Shape of original transform", original_transform.shape)
         print("Shape of target transform", target_transform.shape)
-    img_transformed = cv2.warpPerspective(img, tf_matrix, (target_size,target_size))
+        assert "="*20
+        return None
+    
 
-    return img_transformed
+    
 
 
 # Show camera properties
 print("- Available Devices")
-os.system("v4l2-ctl -d /dev/video0 --list-devices")
+print(subprocess.check_output("v4l2-ctl -d /dev/video0 --list-devices",shell=True).decode('utf-8'))
 print("- Available Parameters")
-os.system("v4l2-ctl -d /dev/video0 --list-ctrls")
+print(subprocess.check_output("v4l2-ctl -d /dev/video0 --list-ctrls",shell=True).decode('utf-8'))
 
 # # Set camera parameters
-os.system("v4l2-ctl --set-ctrl=white_balance_red_component=130") # 130
-os.system("v4l2-ctl --set-ctrl=white_balance_blue_component=160") # 160
-os.system("v4l2-ctl --set-ctrl=gain=90") # 64
-os.system("v4l2-ctl --set-ctrl=exposure_absolute=90") # 45
+print(subprocess.check_output("v4l2-ctl --set-ctrl=white_balance_red_component=130",shell=True).decode('utf-8')) # 130
+print(subprocess.check_output("v4l2-ctl --set-ctrl=white_balance_blue_component=160",shell=True).decode('utf-8')) # 160
+print(subprocess.check_output("v4l2-ctl --set-ctrl=gain=90",shell=True).decode('utf-8')) # 64
+print(subprocess.check_output("v4l2-ctl --set-ctrl=exposure_absolute=90",shell=True).decode('utf-8')) # 45
 # (gain, exp) = (64, 45), (80, 80)
 
 # cv2.namedWindow('image',cv2.WINDOW_NORMAL)
@@ -86,6 +104,8 @@ ser.write('sl'.encode()) # Run top fan
 #                         :])
 
 #     return img_crop
+
+
 
 while True:
 
@@ -118,17 +138,18 @@ while True:
     
     # cv2.imshow("image", frame)
 #   frame_cvt = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    date = time.strftime("%Y%m%d",time.localtime(time.time()))
     time_stamp = time.strftime("%Y%m%d_%H%M%S",time.localtime(time.time()))
     image_name_cropped = f"mark2_{time_stamp}_cropped.jpg"
     image_name_origin = f"mark2_{time_stamp}_original.jpg"
-    image_root = f"images/{date}_{args.location}"
     path_crop = os.path.join(image_root, image_name_cropped)
     path_origin = os.path.join(image_root, image_name_origin)
-    os.makedirs(image_root, exist_ok=True)
-
+    
 
     crop_frame = fitImagingArea(frame)
+
+    if crop_frame.any() == None:
+        continue
+        
     cv2.imwrite(path_crop, crop_frame)
     cv2.imwrite(path_origin, frame)
 
