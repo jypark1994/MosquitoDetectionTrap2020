@@ -51,7 +51,7 @@ os.system("v4l2-ctl --set-ctrl=gain=90") # 64
 os.system("v4l2-ctl --set-ctrl=exposure_absolute=90") # 45
 # (gain, exp) = (64, 45), (80, 80)
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
 if not cap.isOpened():
     raise IOError("Cannot open camera")

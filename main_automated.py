@@ -8,7 +8,7 @@ import argparse
 import sys
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--interval', '-i', type=int, default=5)
+parser.add_argument('--interval', '-i', type=int, default=60)
 parser.add_argument('--location', '-l', type=str, default="test")
 args = parser.parse_args()
 
@@ -37,8 +37,12 @@ def fitImagingArea(img, thr=240, target_size=2000):
 
     original_transform = np.float32(apx)
     target_transform = np.float32([[0,0],[0,target_size],[target_size,target_size],[target_size,0]])
-
-    tf_matrix = cv2.getPerspectiveTransform(original_transform, target_transform)
+    try:
+        tf_matrix = cv2.getPerspectiveTransform(original_transform, target_transform)
+    except:
+        print("Error occured in cv2.getPerspectiveTransform")
+        print("Shape of original transform", original_transform.shape)
+        print("Shape of target transform", target_transform.shape)
     img_transformed = cv2.warpPerspective(img, tf_matrix, (target_size,target_size))
 
     return img_transformed
@@ -56,17 +60,6 @@ os.system("v4l2-ctl --set-ctrl=white_balance_blue_component=160") # 160
 os.system("v4l2-ctl --set-ctrl=gain=90") # 64
 os.system("v4l2-ctl --set-ctrl=exposure_absolute=90") # 45
 # (gain, exp) = (64, 45), (80, 80)
-
-cap = cv2.VideoCapture(0)
-
-if not cap.isOpened():
-    raise IOError("Cannot open camera")
-
-cam_width, cam_height = (4896, 3672) # Full: (4896, 3672), Crop: (3840, 2160)
-
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_width)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_height)
-area = cam_height/2
 
 # cv2.namedWindow('image',cv2.WINDOW_NORMAL)
 # cv2.resizeWindow('image', 1024,1024)
@@ -95,13 +88,26 @@ ser.write('sl'.encode()) # Run top fan
 #     return img_crop
 
 while True:
+
+    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+
+    if not cap.isOpened():
+        raise IOError("Cannot open camera")
+
+    cam_width, cam_height = (4896, 3672) # Full: (4896, 3672), Crop: (3840, 2160)
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_height)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)
+
     
     ser.write("b".encode()) # Indution
     print(f"== Waiting for mosquitoes ({args.interval}[sec])")
-    time.sleep(args.interval) # Wait for 10 seconds
+    time.sleep(args.interval) # Wait for [Interval] seconds
 
     print("== Taking an image ==")
     ret, frame = cap.read()
+    time.sleep(5)
 
     if (np.shape(frame) == ()):
         print("Failed to receive an image from camera")
@@ -116,7 +122,7 @@ while True:
     time_stamp = time.strftime("%Y%m%d_%H%M%S",time.localtime(time.time()))
     image_name_cropped = f"mark2_{time_stamp}_cropped.jpg"
     image_name_origin = f"mark2_{time_stamp}_original.jpg"
-    image_root = f"{date}_{args.location}"
+    image_root = f"images/{date}_{args.location}"
     path_crop = os.path.join(image_root, image_name_cropped)
     path_origin = os.path.join(image_root, image_name_origin)
     os.makedirs(image_root, exist_ok=True)
@@ -135,4 +141,4 @@ while True:
 
     ser.write("b".encode()) # Stop
     
-    del frame
+    del frame, crop_frame, cap
